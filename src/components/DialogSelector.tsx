@@ -2,12 +2,15 @@ import { useState, useMemo } from 'react';
 import { MessageSquare, Users, User, Hash, RefreshCw, Search, X } from 'lucide-react';
 import type { TelegramDialog } from '../types/auth';
 
+export type DialogLimit = 50 | 100 | 200 | 500 | 'all';
+
 interface DialogSelectorProps {
   dialogs: TelegramDialog[];
   onSelectDialog: (dialog: TelegramDialog) => void;
   selectedDialogId: string | null;
   isLoading: boolean;
-  onRefresh: () => void;
+  onRefresh: (limit: DialogLimit) => void;
+  currentLimit: DialogLimit;
 }
 
 export function DialogSelector({
@@ -16,6 +19,7 @@ export function DialogSelector({
   selectedDialogId,
   isLoading,
   onRefresh,
+  currentLimit,
 }: DialogSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -77,7 +81,8 @@ export function DialogSelector({
     return num.toString();
   };
 
-  if (isLoading) {
+  // Показуємо спіннер тільки якщо немає чатів і йде завантаження
+  if (isLoading && dialogs.length === 0) {
     return (
       <div className="dialog-selector loading">
         <div className="spinner" />
@@ -86,12 +91,26 @@ export function DialogSelector({
     );
   }
 
-  if (dialogs.length === 0) {
+  const limitOptions: { value: DialogLimit; label: string }[] = [
+    { value: 50, label: '50' },
+    { value: 100, label: '100' },
+    { value: 200, label: '200' },
+    { value: 500, label: '500' },
+    { value: 'all', label: 'Всі' },
+  ];
+
+  const handleLimitChange = (newLimit: DialogLimit) => {
+    if (newLimit !== currentLimit) {
+      onRefresh(newLimit);
+    }
+  };
+
+  if (dialogs.length === 0 && !isLoading) {
     return (
       <div className="no-chats">
         <MessageSquare size={48} />
         <p>Чатів не знайдено</p>
-        <button type="button" className="refresh-btn" onClick={onRefresh}>
+        <button type="button" className="refresh-btn" onClick={() => onRefresh(currentLimit)}>
           <RefreshCw size={18} />
           Оновити
         </button>
@@ -104,16 +123,36 @@ export function DialogSelector({
       <div className="chat-selector-header">
         <div>
           <h2>Виберіть чат для експорту</h2>
-          <p className="chat-count">Знайдено чатів: {dialogs.length}</p>
+          <p className="chat-count">
+            {isLoading ? 'Завантаження...' : `Знайдено чатів: ${dialogs.length}`}
+          </p>
         </div>
-        <button
-          type="button"
-          className="refresh-btn"
-          onClick={onRefresh}
-          disabled={isLoading}
-        >
-          <RefreshCw size={18} />
-        </button>
+        <div className="header-actions">
+          <div className="limit-selector">
+            <span className="limit-label">Показати:</span>
+            <div className="limit-buttons">
+              {limitOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`limit-btn ${currentLimit === option.value ? 'active' : ''}`}
+                  onClick={() => handleLimitChange(option.value)}
+                  disabled={isLoading}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={() => onRefresh(currentLimit)}
+            disabled={isLoading}
+          >
+            <RefreshCw size={18} className={isLoading ? 'spinning' : ''} />
+          </button>
+        </div>
       </div>
 
       <div className="search-box">

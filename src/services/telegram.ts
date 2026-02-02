@@ -110,10 +110,13 @@ class TelegramService {
   }
 
   // Швидке завантаження чатів без фото
-  async getDialogs(onProgress?: (dialogs: TelegramDialog[]) => void): Promise<TelegramDialog[]> {
+  async getDialogs(
+    onProgress?: (dialogs: TelegramDialog[]) => void,
+    limit?: number // undefined = всі чати
+  ): Promise<TelegramDialog[]> {
     if (!this.client) throw new Error('Клієнт не ініціалізовано');
 
-    const dialogs = await this.client.getDialogs({ limit: 100 });
+    const dialogs = await this.client.getDialogs({ limit: limit ?? undefined });
 
     const results: TelegramDialog[] = [];
 

@@ -387,7 +387,68 @@ body {
 
 .chat-count {
   color: var(--text-muted);
+  font-size: 14px;
+}
+
+.chat-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.limit-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.limit-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.limit-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.limit-btn {
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+}
+
+.limit-btn:hover:not(:disabled) {
+  border-color: var(--primary-light);
+}
+
+.limit-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.limit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-btn .spinning {
+  animation: spin 1s linear infinite;
 }
 
 /* === Search Box === */

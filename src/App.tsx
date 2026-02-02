@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ApiSetupGuide } from './components/ApiSetupGuide';
 import { AuthForm } from './components/AuthForm';
-import { DialogSelector } from './components/DialogSelector';
+import { DialogSelector, type DialogLimit } from './components/DialogSelector';
 import { ExportProgress } from './components/ExportProgress';
 import { DateRangeSelector, type DateRange } from './components/DateRangeSelector';
 import { TopicSelector } from './components/TopicSelector';
@@ -44,6 +44,7 @@ function App() {
   });
 
   const [dialogs, setDialogs] = useState<TelegramDialog[]>([]);
+  const [dialogLimit, setDialogLimit] = useState<DialogLimit>(100);
   const [selectedDialog, setSelectedDialog] = useState<TelegramDialog | null>(null);
   const [messages, setMessages] = useState<TelegramMessageData[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
@@ -65,15 +66,22 @@ function App() {
     error: null,
   });
 
-  const loadDialogs = useCallback(async () => {
+  const loadDialogs = useCallback(async (limit: DialogLimit = 100) => {
     setIsLoading(true);
+    setDialogLimit(limit);
+    setDialogs([]); // Очищуємо старі чати перед завантаженням
     try {
+      const apiLimit = limit === 'all' ? undefined : limit;
+      let isFirstUpdate = true;
       // Поступове завантаження - спочатку без фото, потім з фото
       await telegramService.getDialogs((progressDialogs) => {
         setDialogs(progressDialogs);
         // Після першого оновлення прибираємо індикатор завантаження
-        setIsLoading(false);
-      });
+        if (isFirstUpdate) {
+          setIsLoading(false);
+          isFirstUpdate = false;
+        }
+      }, apiLimit);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Помилка завантаження чатів');
       setIsLoading(false);
@@ -457,6 +465,7 @@ function App() {
               selectedDialogId={selectedDialog?.id ?? null}
               isLoading={isLoading}
               onRefresh={loadDialogs}
+              currentLimit={dialogLimit}
             />
           </>
         )}
