@@ -19,6 +19,16 @@ export interface TelegramDialog {
   lastMessage?: string;
   lastMessageDate?: Date;
   entity: unknown;
+  isForum?: boolean;
+}
+
+export interface ForumTopic {
+  id: number;
+  title: string;
+  iconColor?: number;
+  iconEmojiId?: string;
+  creationDate?: Date;
+  messagesCount?: number;
 }
 
 export interface TelegramMessageData {

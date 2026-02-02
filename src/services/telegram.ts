@@ -2,6 +2,7 @@ import type {
   ApiCredentials,
   TelegramDialog,
   TelegramMessageData,
+  ForumTopic,
 } from '../types/auth';
 import { saveSession, getSession } from '../utils/storage';
 
@@ -140,14 +141,51 @@ class TelegramService {
           ? new Date(dialog.message.date * 1000)
           : undefined,
         entity: dialog.entity,
+        isForum: entity?.forum === true,
       };
     });
+  }
+
+  async getForumTopics(entity: unknown): Promise<ForumTopic[]> {
+    if (!this.client) throw new Error('Клієнт не ініціалізовано');
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await this.client.invoke(
+        new Api.channels.GetForumTopics({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          channel: entity as any,
+          limit: 100,
+        })
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const topics = (result as any).topics || [];
+
+      return topics.map((topic: {
+        id: number;
+        title: string;
+        iconColor?: number;
+        iconEmojiId?: { value: string };
+        date?: number;
+      }) => ({
+        id: topic.id,
+        title: topic.title,
+        iconColor: topic.iconColor,
+        iconEmojiId: topic.iconEmojiId?.value,
+        creationDate: topic.date ? new Date(topic.date * 1000) : undefined,
+      }));
+    } catch (error) {
+      console.error('Помилка отримання топіків:', error);
+      return [];
+    }
   }
 
   async getMessages(
     entity: unknown,
     onProgress?: (count: number, total: number) => void,
-    dateRange?: { from: Date | null; to: Date | null }
+    dateRange?: { from: Date | null; to: Date | null },
+    topicId?: number
   ): Promise<TelegramMessageData[]> {
     if (!this.client) throw new Error('Клієнт не ініціалізовано');
 
@@ -158,11 +196,27 @@ class TelegramService {
     const offsetDate = dateRange?.to ? Math.floor(dateRange.to.getTime() / 1000) : undefined;
     const minDate = dateRange?.from ? Math.floor(dateRange.from.getTime() / 1000) : undefined;
 
+    // Параметри для запиту
+    const iterParams: {
+      limit?: number;
+      offsetDate?: number;
+      replyTo?: number;
+    } = {
+      limit: undefined, // Всі повідомлення
+      offsetDate, // Починаємо з цієї дати (якщо вказано)
+    };
+
+    // Якщо вказано топік, фільтруємо по ньому
+    if (topicId) {
+      iterParams.replyTo = topicId;
+    }
+
     // Спочатку отримаємо приблизну кількість повідомлень
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstBatch = await this.client.getMessages(entity as any, {
       limit: 1,
       offsetDate,
+      replyTo: topicId,
     });
 
     if (firstBatch.total) {
@@ -171,10 +225,7 @@ class TelegramService {
 
     // Ітеруємо по всіх повідомленнях
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for await (const message of this.client.iterMessages(entity as any, {
-      limit: undefined, // Всі повідомлення
-      offsetDate, // Починаємо з цієї дати (якщо вказано)
-    })) {
+    for await (const message of this.client.iterMessages(entity as any, iterParams)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const msg = message as any;
 

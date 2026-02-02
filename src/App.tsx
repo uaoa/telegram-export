@@ -6,6 +6,8 @@ import { AuthForm } from './components/AuthForm';
 import { DialogSelector } from './components/DialogSelector';
 import { ExportProgress } from './components/ExportProgress';
 import { DateRangeSelector, type DateRange } from './components/DateRangeSelector';
+import { TopicSelector } from './components/TopicSelector';
+import { ExportConfirmModal } from './components/ExportConfirmModal';
 import { telegramService } from './services/telegram';
 import {
   getApiCredentials,
@@ -19,10 +21,11 @@ import type {
   TelegramDialog,
   TelegramMessageData,
   ExportState,
+  ForumTopic,
 } from './types/auth';
 import './App.css';
 
-type AppStep = 'setup' | 'auth' | 'dialogs' | 'exporting';
+type AppStep = 'setup' | 'auth' | 'dialogs' | 'topics' | 'exporting';
 
 function App() {
   const [step, setStep] = useState<AppStep>('setup');
@@ -41,6 +44,15 @@ function App() {
   const [selectedDialog, setSelectedDialog] = useState<TelegramDialog | null>(null);
   const [messages, setMessages] = useState<TelegramMessageData[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
+
+  // Топіки
+  const [topics, setTopics] = useState<ForumTopic[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState<ForumTopic | null>(null);
+  const [isLoadingTopics, setIsLoadingTopics] = useState(false);
+
+  // Modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingDialog, setPendingDialog] = useState<TelegramDialog | null>(null);
 
   const [exportState, setExportState] = useState<ExportState>({
     isExporting: false,
@@ -238,8 +250,50 @@ function App() {
     setSelectedDialog(null);
   }, []);
 
+  // Обробка вибору діалогу
   const handleSelectDialog = useCallback(async (dialog: TelegramDialog) => {
-    setSelectedDialog(dialog);
+    // Якщо це форум - показуємо топіки
+    if (dialog.isForum) {
+      setSelectedDialog(dialog);
+      setIsLoadingTopics(true);
+      setStep('topics');
+
+      try {
+        const loadedTopics = await telegramService.getForumTopics(dialog.entity);
+        setTopics(loadedTopics);
+      } catch (err) {
+        console.error('Помилка завантаження топіків:', err);
+        setTopics([]);
+      } finally {
+        setIsLoadingTopics(false);
+      }
+    } else {
+      // Звичайний чат - показуємо modal підтвердження
+      setPendingDialog(dialog);
+      setSelectedDialog(dialog);
+      setSelectedTopic(null);
+      setShowConfirmModal(true);
+    }
+  }, []);
+
+  // Вибір топіка
+  const handleSelectTopic = useCallback((topic: ForumTopic | null) => {
+    setSelectedTopic(topic);
+    setShowConfirmModal(true);
+  }, []);
+
+  // Експорт всього чату (без вибору топіка)
+  const handleExportAll = useCallback(() => {
+    setSelectedTopic(null);
+    setShowConfirmModal(true);
+  }, []);
+
+  // Підтвердження експорту
+  const handleConfirmExport = useCallback(async () => {
+    const dialog = pendingDialog || selectedDialog;
+    if (!dialog) return;
+
+    setShowConfirmModal(false);
     setStep('exporting');
     setExportState({
       isExporting: true,
@@ -259,7 +313,8 @@ function App() {
             totalMessages: total,
           }));
         },
-        dateRange
+        dateRange,
+        selectedTopic?.id
       );
 
       setMessages(loadedMessages);
@@ -278,11 +333,14 @@ function App() {
         error: err instanceof Error ? err.message : 'Помилка завантаження',
       }));
     }
-  }, [dateRange]);
+  }, [pendingDialog, selectedDialog, dateRange, selectedTopic]);
 
   const handleCancelExport = useCallback(() => {
     setStep('dialogs');
     setSelectedDialog(null);
+    setPendingDialog(null);
+    setSelectedTopic(null);
+    setTopics([]);
     setMessages([]);
     setExportState({
       isExporting: false,
@@ -293,13 +351,25 @@ function App() {
     });
   }, []);
 
+  const handleBackToDialogs = useCallback(() => {
+    setStep('dialogs');
+    setSelectedDialog(null);
+    setPendingDialog(null);
+    setSelectedTopic(null);
+    setTopics([]);
+  }, []);
+
   const handleExport = useCallback(
     (format: 'html' | 'json') => {
       if (!selectedDialog || messages.length === 0) return;
 
+      const exportName = selectedTopic
+        ? `${selectedDialog.name} - ${selectedTopic.title}`
+        : selectedDialog.name;
+
       exportChatFromApi(
         {
-          name: selectedDialog.name,
+          name: exportName,
           type: selectedDialog.type,
           id: selectedDialog.id,
         },
@@ -307,7 +377,7 @@ function App() {
         format
       );
     },
-    [selectedDialog, messages]
+    [selectedDialog, selectedTopic, messages]
   );
 
   const handleLogout = useCallback(async () => {
@@ -317,6 +387,11 @@ function App() {
     setDialogs([]);
     setSelectedDialog(null);
     setMessages([]);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setShowConfirmModal(false);
+    setPendingDialog(null);
   }, []);
 
   return (
@@ -363,6 +438,28 @@ function App() {
           </>
         )}
 
+        {step === 'topics' && selectedDialog && (
+          <>
+            <div className="step-header">
+              <button type="button" className="back-btn" onClick={handleBackToDialogs}>
+                ← Назад до чатів
+              </button>
+            </div>
+            <DateRangeSelector
+              dateRange={dateRange}
+              onChange={setDateRange}
+            />
+            <TopicSelector
+              topics={topics}
+              onSelectTopic={handleSelectTopic}
+              selectedTopicId={selectedTopic?.id ?? null}
+              isLoading={isLoadingTopics}
+              chatName={selectedDialog.name}
+              onExportAll={handleExportAll}
+            />
+          </>
+        )}
+
         {step === 'exporting' && selectedDialog && (
           <>
             <div className="step-header">
@@ -372,7 +469,7 @@ function App() {
             </div>
             <ExportProgress
               state={exportState}
-              chatName={selectedDialog.name}
+              chatName={selectedTopic ? `${selectedDialog.name} - ${selectedTopic.title}` : selectedDialog.name}
               onCancel={handleCancelExport}
               onExport={handleExport}
             />
@@ -381,6 +478,19 @@ function App() {
       </main>
 
       <Footer />
+
+      {/* Modal підтвердження експорту */}
+      {showConfirmModal && (pendingDialog ?? selectedDialog) && (
+        <ExportConfirmModal
+          isOpen={showConfirmModal}
+          onClose={handleCloseModal}
+          onConfirm={handleConfirmExport}
+          dialog={pendingDialog ?? selectedDialog ?? dialogs[0]}
+          dateRange={dateRange}
+          selectedTopic={selectedTopic}
+          isLoading={false}
+        />
+      )}
     </div>
   );
 }
