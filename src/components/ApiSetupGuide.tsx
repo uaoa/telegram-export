@@ -75,8 +75,7 @@ export function ApiSetupGuide({ onSubmit, isLoading, error }: ApiSetupGuideProps
           <div className="step-content">
             <h4>Увійдіть з вашим номером телефону</h4>
             <p>
-              Введіть номер телефону, який прив'язаний до вашого Telegram
-              акаунту. Ви отримаєте код підтвердження.
+              Введіть номер телефону вашого Telegram акаунту та код підтвердження.
             </p>
           </div>
         </div>
@@ -84,31 +83,13 @@ export function ApiSetupGuide({ onSubmit, isLoading, error }: ApiSetupGuideProps
         <div className="setup-step">
           <div className="step-number">3</div>
           <div className="step-content">
-            <h4>Створіть новий додаток</h4>
-            <p>
-              Натисніть <strong>"API development tools"</strong> і заповніть форму:
-            </p>
-            <ul>
-              <li>
-                <strong>App title:</strong> будь-яка назва (напр. "My Export")
-              </li>
-              <li>
-                <strong>Short name:</strong> коротка назва латиницею
-              </li>
-              <li>
-                <strong>Platform:</strong> Desktop
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="setup-step">
-          <div className="step-number">4</div>
-          <div className="step-content">
             <h4>Скопіюйте API ID та API Hash</h4>
             <p>
-              Після створення додатку ви побачите <strong>App api_id</strong> та{' '}
+              На сторінці "App configuration" ви побачите <strong>App api_id</strong> та{' '}
               <strong>App api_hash</strong>. Скопіюйте їх в поля нижче.
+            </p>
+            <p className="hint">
+              Якщо у вас ще немає додатку — натисніть "API development tools" та створіть його (назва може бути будь-якою).
             </p>
           </div>
         </div>

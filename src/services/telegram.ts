@@ -146,17 +146,23 @@ class TelegramService {
 
   async getMessages(
     entity: unknown,
-    onProgress?: (count: number, total: number) => void
+    onProgress?: (count: number, total: number) => void,
+    dateRange?: { from: Date | null; to: Date | null }
   ): Promise<TelegramMessageData[]> {
     if (!this.client) throw new Error('Клієнт не ініціалізовано');
 
     const messages: TelegramMessageData[] = [];
     let total = 0;
 
+    // Конвертуємо дати в Unix timestamp для API
+    const offsetDate = dateRange?.to ? Math.floor(dateRange.to.getTime() / 1000) : undefined;
+    const minDate = dateRange?.from ? Math.floor(dateRange.from.getTime() / 1000) : undefined;
+
     // Спочатку отримаємо приблизну кількість повідомлень
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const firstBatch = await this.client.getMessages(entity as any, {
       limit: 1,
+      offsetDate,
     });
 
     if (firstBatch.total) {
@@ -167,9 +173,16 @@ class TelegramService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for await (const message of this.client.iterMessages(entity as any, {
       limit: undefined, // Всі повідомлення
+      offsetDate, // Починаємо з цієї дати (якщо вказано)
     })) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const msg = message as any;
+
+      // Перевіряємо чи повідомлення не старіше мінімальної дати
+      if (minDate && msg.date < minDate) {
+        // Повідомлення відсортовані від нових до старих, тому можемо зупинитись
+        break;
+      }
 
       let fromName: string | undefined;
       let fromId: string | undefined;

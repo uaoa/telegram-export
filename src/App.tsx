@@ -5,6 +5,7 @@ import { ApiSetupGuide } from './components/ApiSetupGuide';
 import { AuthForm } from './components/AuthForm';
 import { DialogSelector } from './components/DialogSelector';
 import { ExportProgress } from './components/ExportProgress';
+import { DateRangeSelector, type DateRange } from './components/DateRangeSelector';
 import { telegramService } from './services/telegram';
 import {
   getApiCredentials,
@@ -39,6 +40,7 @@ function App() {
   const [dialogs, setDialogs] = useState<TelegramDialog[]>([]);
   const [selectedDialog, setSelectedDialog] = useState<TelegramDialog | null>(null);
   const [messages, setMessages] = useState<TelegramMessageData[]>([]);
+  const [dateRange, setDateRange] = useState<DateRange>({ from: null, to: null });
 
   const [exportState, setExportState] = useState<ExportState>({
     isExporting: false,
@@ -256,7 +258,8 @@ function App() {
             exportedMessages: count,
             totalMessages: total,
           }));
-        }
+        },
+        dateRange
       );
 
       setMessages(loadedMessages);
@@ -275,7 +278,7 @@ function App() {
         error: err instanceof Error ? err.message : 'Помилка завантаження',
       }));
     }
-  }, []);
+  }, [dateRange]);
 
   const handleCancelExport = useCallback(() => {
     setStep('dialogs');
@@ -346,6 +349,10 @@ function App() {
                 Вийти з акаунту
               </button>
             </div>
+            <DateRangeSelector
+              dateRange={dateRange}
+              onChange={setDateRange}
+            />
             <DialogSelector
               dialogs={dialogs}
               onSelectDialog={handleSelectDialog}
