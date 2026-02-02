@@ -20,6 +20,8 @@ export interface TelegramDialog {
   lastMessageDate?: Date;
   entity: unknown;
   isForum?: boolean;
+  photoUrl?: string;
+  messagesCount?: number;
 }
 
 export interface ForumTopic {

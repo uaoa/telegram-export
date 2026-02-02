@@ -1,4 +1,5 @@
-import { MessageSquare, Users, User, Hash, RefreshCw } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { MessageSquare, Users, User, Hash, RefreshCw, Search, X } from 'lucide-react';
 import type { TelegramDialog } from '../types/auth';
 
 interface DialogSelectorProps {
@@ -16,6 +17,16 @@ export function DialogSelector({
   isLoading,
   onRefresh,
 }: DialogSelectorProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredDialogs = useMemo(() => {
+    if (!searchQuery.trim()) return dialogs;
+    const query = searchQuery.toLowerCase();
+    return dialogs.filter((dialog) =>
+      dialog.name.toLowerCase().includes(query)
+    );
+  }, [dialogs, searchQuery]);
+
   const getDialogIcon = (type: TelegramDialog['type']) => {
     switch (type) {
       case 'user':
@@ -29,14 +40,18 @@ export function DialogSelector({
     }
   };
 
-  const getTypeLabel = (type: TelegramDialog['type']): string => {
+  const getTypeLabel = (dialog: TelegramDialog): string => {
     const labels: Record<TelegramDialog['type'], string> = {
       user: 'Особистий чат',
       group: 'Група',
       channel: 'Канал',
       chat: 'Чат',
     };
-    return labels[type] || type;
+    let label = labels[dialog.type] || dialog.type;
+    if (dialog.isForum) {
+      label += ' (форум)';
+    }
+    return label;
   };
 
   const formatDate = (date?: Date): string => {
@@ -50,6 +65,16 @@ export function DialogSelector({
   const truncateText = (text: string, maxLength: number): string => {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+  };
+
+  const formatNumber = (num: number): string => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
   };
 
   if (isLoading) {
@@ -91,17 +116,59 @@ export function DialogSelector({
         </button>
       </div>
 
+      <div className="search-box">
+        <Search size={18} className="search-icon" />
+        <input
+          type="text"
+          placeholder="Пошук чатів..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="search-input"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            className="search-clear"
+            onClick={() => setSearchQuery('')}
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {searchQuery && filteredDialogs.length === 0 && (
+        <div className="no-results">
+          <p>Чатів не знайдено за запитом "{searchQuery}"</p>
+        </div>
+      )}
+
       <div className="chat-list">
-        {dialogs.map((dialog) => (
+        {filteredDialogs.map((dialog) => (
           <div
             key={dialog.id}
             className={`chat-item ${selectedDialogId === dialog.id ? 'selected' : ''}`}
             onClick={() => onSelectDialog(dialog)}
           >
-            <div className="chat-icon">{getDialogIcon(dialog.type)}</div>
+            {dialog.photoUrl ? (
+              <img
+                src={dialog.photoUrl}
+                alt={dialog.name}
+                className="chat-avatar"
+              />
+            ) : (
+              <div className="chat-icon">{getDialogIcon(dialog.type)}</div>
+            )}
             <div className="chat-info">
               <h3 className="chat-name">{dialog.name}</h3>
-              <span className="chat-type">{getTypeLabel(dialog.type)}</span>
+              <div className="chat-type-row">
+                <span className="chat-type">{getTypeLabel(dialog)}</span>
+                {dialog.messagesCount !== undefined && dialog.messagesCount > 0 && (
+                  <span className="members-count">
+                    <Users size={12} />
+                    {formatNumber(dialog.messagesCount)}
+                  </span>
+                )}
+              </div>
               {dialog.lastMessage && (
                 <p className="last-message">
                   {truncateText(dialog.lastMessage, 50)}

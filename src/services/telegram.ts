@@ -114,7 +114,9 @@ class TelegramService {
 
     const dialogs = await this.client.getDialogs({ limit: 100 });
 
-    return dialogs.map((dialog) => {
+    const results: TelegramDialog[] = [];
+
+    for (const dialog of dialogs) {
       let type: TelegramDialog['type'] = 'chat';
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const entity = dialog.entity as any;
@@ -131,7 +133,34 @@ class TelegramService {
         }
       }
 
-      return {
+      // Отримуємо фото профілю
+      let photoUrl: string | undefined;
+      try {
+        if (entity?.photo) {
+          const photoBuffer = await this.client.downloadProfilePhoto(entity, {
+            isBig: false,
+          });
+          if (photoBuffer && typeof photoBuffer !== 'string' && photoBuffer.length > 0) {
+            const uint8Array = new Uint8Array(photoBuffer);
+            let binary = '';
+            uint8Array.forEach((byte) => {
+              binary += String.fromCharCode(byte);
+            });
+            const base64 = btoa(binary);
+            photoUrl = `data:image/jpeg;base64,${base64}`;
+          }
+        }
+      } catch {
+        // Ігноруємо помилки завантаження фото
+      }
+
+      // Отримуємо кількість повідомлень (якщо доступно)
+      let messagesCount: number | undefined;
+      if (entity?.participantsCount !== undefined) {
+        messagesCount = entity.participantsCount;
+      }
+
+      results.push({
         id: dialog.id?.toString() || '',
         name: dialog.title || dialog.name || 'Невідомий чат',
         type,
@@ -142,8 +171,12 @@ class TelegramService {
           : undefined,
         entity: dialog.entity,
         isForum: entity?.forum === true,
-      };
-    });
+        photoUrl,
+        messagesCount,
+      });
+    }
+
+    return results;
   }
 
   async getForumTopics(entity: unknown): Promise<ForumTopic[]> {

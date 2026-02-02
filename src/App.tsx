@@ -455,6 +455,7 @@ function App() {
               selectedTopicId={selectedTopic?.id ?? null}
               isLoading={isLoadingTopics}
               chatName={selectedDialog.name}
+              chatPhotoUrl={selectedDialog.photoUrl}
               onExportAll={handleExportAll}
             />
           </>

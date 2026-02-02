@@ -1,4 +1,4 @@
-import { MessageSquare, ChevronRight } from 'lucide-react';
+import { MessageSquare, ChevronRight, Users, Hash } from 'lucide-react';
 import type { ForumTopic } from '../types/auth';
 
 interface TopicSelectorProps {
@@ -7,6 +7,7 @@ interface TopicSelectorProps {
   selectedTopicId: number | null;
   isLoading: boolean;
   chatName: string;
+  chatPhotoUrl?: string;
   onExportAll: () => void;
 }
 
@@ -16,6 +17,7 @@ export function TopicSelector({
   selectedTopicId,
   isLoading,
   chatName,
+  chatPhotoUrl,
   onExportAll,
 }: TopicSelectorProps) {
   if (isLoading) {
@@ -27,26 +29,55 @@ export function TopicSelector({
     );
   }
 
+  // Кольори топіків Telegram
   const getTopicColor = (colorId?: number) => {
     const colors: Record<number, string> = {
-      0: '#6FB9F0',
-      1: '#FFD67E',
-      2: '#CB86DB',
-      3: '#8EEE98',
-      4: '#FF93B2',
-      5: '#FB6F5F',
-      6: '#FFD67E',
+      0: '#6FB9F0', // блакитний
+      1: '#FFD67E', // жовтий
+      2: '#CB86DB', // фіолетовий
+      3: '#8EEE98', // зелений
+      4: '#FF93B2', // рожевий
+      5: '#FB6F5F', // червоний
+      6: '#FFD67E', // жовтий (дублікат)
     };
-    return colors[colorId || 0] || colors[0];
+    return colors[colorId ?? 0] || colors[0];
   };
+
+  // Емоджі для топіків на основі кольору
+  const getTopicEmoji = (colorId?: number) => {
+    const emojis: Record<number, string> = {
+      0: '💬', // блакитний
+      1: '⭐', // жовтий
+      2: '💜', // фіолетовий
+      3: '💚', // зелений
+      4: '💖', // рожевий
+      5: '🔥', // червоний
+      6: '✨', // жовтий
+    };
+    return emojis[colorId ?? 0] || '💬';
+  };
+
+  // Перевіряємо чи це "General" топік (id = 1)
+  const isGeneralTopic = (topicId: number) => topicId === 1;
 
   return (
     <div className="topic-selector">
       <div className="topic-selector-header">
-        <h2>Топіки в "{chatName}"</h2>
-        <p className="topic-count">
-          {topics.length} {topics.length === 1 ? 'топік' : topics.length < 5 ? 'топіки' : 'топіків'}
-        </p>
+        <div className="topic-chat-info">
+          {chatPhotoUrl ? (
+            <img src={chatPhotoUrl} alt={chatName} className="topic-chat-avatar" />
+          ) : (
+            <div className="topic-chat-icon">
+              <Users size={24} />
+            </div>
+          )}
+          <div>
+            <h2>Топіки в "{chatName}"</h2>
+            <p className="topic-count">
+              {topics.length} {topics.length === 1 ? 'топік' : topics.length < 5 ? 'топіки' : 'топіків'}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="topic-list">
@@ -74,10 +105,10 @@ export function TopicSelector({
               className="topic-icon"
               style={{ backgroundColor: getTopicColor(topic.iconColor) }}
             >
-              {topic.iconEmojiId ? (
-                <span className="topic-emoji">{topic.iconEmojiId}</span>
+              {isGeneralTopic(topic.id) ? (
+                <Hash size={20} />
               ) : (
-                <MessageSquare size={20} />
+                <span className="topic-emoji">{getTopicEmoji(topic.iconColor)}</span>
               )}
             </div>
             <div className="topic-info">
