@@ -8,7 +8,7 @@ export function Header() {
         <h1>Telegram Export</h1>
       </div>
       <p className="tagline">
-        Експортуйте ваші чати в HTML або JSON за лічені секунди
+        Експортуйте ваші чати в HTML або JSON
       </p>
     </header>
   );
