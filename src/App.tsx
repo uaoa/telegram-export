@@ -360,7 +360,7 @@ function App() {
   }, []);
 
   const handleExport = useCallback(
-    (format: 'html' | 'json') => {
+    (format: 'html' | 'json' | 'json-ai') => {
       if (!selectedDialog || messages.length === 0) return;
 
       const exportName = selectedTopic

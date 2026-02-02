@@ -1,11 +1,11 @@
-import { Download, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Download, X, CheckCircle, AlertCircle, Bot } from 'lucide-react';
 import type { ExportState } from '../types/auth';
 
 interface ExportProgressProps {
   state: ExportState;
   chatName: string;
   onCancel: () => void;
-  onExport: (format: 'html' | 'json') => void;
+  onExport: (format: 'html' | 'json' | 'json-ai') => void;
 }
 
 export function ExportProgress({
@@ -98,6 +98,16 @@ export function ExportProgress({
                 <Download size={24} />
                 <span>JSON</span>
                 <small>Для розробників</small>
+              </button>
+
+              <button
+                type="button"
+                className="format-btn ai-format"
+                onClick={() => onExport('json-ai')}
+              >
+                <Bot size={24} />
+                <span>JSON для ШІ</span>
+                <small>Компактний, для аналізу</small>
               </button>
             </div>
           </div>

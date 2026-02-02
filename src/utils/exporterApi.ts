@@ -10,10 +10,12 @@ interface ChatInfo {
 export function exportChatFromApi(
   chat: ChatInfo,
   messages: TelegramMessageData[],
-  format: 'html' | 'json'
+  format: 'html' | 'json' | 'json-ai'
 ): void {
   if (format === 'json') {
     exportAsJson(chat, messages);
+  } else if (format === 'json-ai') {
+    exportAsJsonForAI(chat, messages);
   } else {
     exportAsHtml(chat, messages);
   }
@@ -42,6 +44,71 @@ function exportAsJson(chat: ChatInfo, messages: TelegramMessageData[]): void {
   });
 
   const fileName = sanitizeFileName(chat.name) + '_export.json';
+  saveAs(blob, fileName);
+}
+
+// Компактний формат для аналізу ШІ - мінімум метаданих, максимум контенту
+function exportAsJsonForAI(chat: ChatInfo, messages: TelegramMessageData[]): void {
+  // Сортуємо повідомлення хронологічно
+  const sortedMessages = [...messages].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // Форматуємо дату коротко
+  const formatShortDate = (date: Date) => {
+    return date.toLocaleDateString('uk-UA', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    }) + ' ' + date.toLocaleTimeString('uk-UA', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Компактний формат: тільки автор, час та текст
+  const compactMessages = sortedMessages
+    .filter(msg => msg.text.trim()) // Пропускаємо пусті повідомлення
+    .map((msg) => {
+      const author = msg.fromName || 'Анонім';
+      const time = formatShortDate(msg.date);
+      const text = msg.text.trim();
+
+      // Додаємо інфо про медіа якщо є
+      let mediaNote = '';
+      if (msg.media) {
+        if (msg.media.type === 'photo') {
+          mediaNote = ' [фото]';
+        } else if (msg.media.fileName) {
+          mediaNote = ` [файл: ${msg.media.fileName}]`;
+        } else if (msg.media.type !== 'webpage') {
+          mediaNote = ` [${msg.media.type}]`;
+        }
+      }
+
+      // Позначаємо пересилання
+      const fwdNote = msg.forwardedFrom ? ` (переслано від ${msg.forwardedFrom})` : '';
+
+      return {
+        t: time,
+        a: author,
+        m: text + mediaNote + fwdNote,
+      };
+    });
+
+  const exportData = {
+    _info: 'Експорт чату для аналізу ШІ. Поля: t=час, a=автор, m=повідомлення',
+    chat: chat.name,
+    period: compactMessages.length > 0
+      ? `${compactMessages[0].t} — ${compactMessages[compactMessages.length - 1].t}`
+      : 'немає повідомлень',
+    count: compactMessages.length,
+    messages: compactMessages,
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  });
+
+  const fileName = sanitizeFileName(chat.name) + '_ai.json';
   saveAs(blob, fileName);
 }
 
