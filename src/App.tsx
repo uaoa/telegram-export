@@ -8,6 +8,7 @@ import { ExportProgress } from './components/ExportProgress';
 import { DateRangeSelector, type DateRange } from './components/DateRangeSelector';
 import { TopicSelector } from './components/TopicSelector';
 import { ExportConfirmModal } from './components/ExportConfirmModal';
+import { FileAnalyzer } from './components/FileAnalyzer';
 import { telegramService } from './services/telegram';
 import {
   getApiCredentials,
@@ -25,9 +26,11 @@ import type {
 } from './types/auth';
 import './App.css';
 
+type AppMode = 'export' | 'analyze';
 type AppStep = 'setup' | 'auth' | 'dialogs' | 'topics' | 'exporting';
 
 function App() {
+  const [mode, setMode] = useState<AppMode>('export');
   const [step, setStep] = useState<AppStep>('setup');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,11 +68,14 @@ function App() {
   const loadDialogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const loadedDialogs = await telegramService.getDialogs();
-      setDialogs(loadedDialogs);
+      // Поступове завантаження - спочатку без фото, потім з фото
+      await telegramService.getDialogs((progressDialogs) => {
+        setDialogs(progressDialogs);
+        // Після першого оновлення прибираємо індикатор завантаження
+        setIsLoading(false);
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Помилка завантаження чатів');
-    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -394,6 +400,19 @@ function App() {
     setPendingDialog(null);
   }, []);
 
+  // Режим аналізу файлу
+  if (mode === 'analyze') {
+    return (
+      <div className="app">
+        <Header />
+        <main className="main">
+          <FileAnalyzer onBack={() => setMode('export')} />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <Header />
@@ -404,6 +423,7 @@ function App() {
             onSubmit={handleApiSubmit}
             isLoading={isLoading}
             error={error}
+            onAnalyzeFile={() => setMode('analyze')}
           />
         )}
 
@@ -422,6 +442,9 @@ function App() {
             <div className="step-header">
               <button type="button" className="back-btn logout" onClick={handleLogout}>
                 Вийти з акаунту
+              </button>
+              <button type="button" className="analyze-link-btn" onClick={() => setMode('analyze')}>
+                Аналіз файлу
               </button>
             </div>
             <DateRangeSelector

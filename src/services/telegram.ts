@@ -109,13 +109,15 @@ class TelegramService {
     saveSession(sessionString);
   }
 
-  async getDialogs(): Promise<TelegramDialog[]> {
+  // Швидке завантаження чатів без фото
+  async getDialogs(onProgress?: (dialogs: TelegramDialog[]) => void): Promise<TelegramDialog[]> {
     if (!this.client) throw new Error('Клієнт не ініціалізовано');
 
     const dialogs = await this.client.getDialogs({ limit: 100 });
 
     const results: TelegramDialog[] = [];
 
+    // Спочатку швидко створюємо список без фото
     for (const dialog of dialogs) {
       let type: TelegramDialog['type'] = 'chat';
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,28 +135,7 @@ class TelegramService {
         }
       }
 
-      // Отримуємо фото профілю
-      let photoUrl: string | undefined;
-      try {
-        if (entity?.photo) {
-          const photoBuffer = await this.client.downloadProfilePhoto(entity, {
-            isBig: false,
-          });
-          if (photoBuffer && typeof photoBuffer !== 'string' && photoBuffer.length > 0) {
-            const uint8Array = new Uint8Array(photoBuffer);
-            let binary = '';
-            uint8Array.forEach((byte) => {
-              binary += String.fromCharCode(byte);
-            });
-            const base64 = btoa(binary);
-            photoUrl = `data:image/jpeg;base64,${base64}`;
-          }
-        }
-      } catch {
-        // Ігноруємо помилки завантаження фото
-      }
-
-      // Отримуємо кількість повідомлень (якщо доступно)
+      // Отримуємо кількість учасників (якщо доступно)
       let messagesCount: number | undefined;
       if (entity?.participantsCount !== undefined) {
         messagesCount = entity.participantsCount;
@@ -171,9 +152,52 @@ class TelegramService {
           : undefined,
         entity: dialog.entity,
         isForum: entity?.forum === true,
-        photoUrl,
+        photoUrl: undefined, // Фото завантажимо потім
         messagesCount,
       });
+    }
+
+    // Відразу повертаємо результат без фото
+    if (onProgress) {
+      onProgress([...results]);
+    }
+
+    // Завантажуємо фото паралельно у фоні (батчами по 5)
+    const batchSize = 5;
+    for (let i = 0; i < dialogs.length; i += batchSize) {
+      const batch = dialogs.slice(i, i + batchSize);
+
+      await Promise.all(
+        batch.map(async (dialog, batchIndex) => {
+          const index = i + batchIndex;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const entity = dialog.entity as any;
+
+          if (entity?.photo && this.client) {
+            try {
+              const photoBuffer = await this.client.downloadProfilePhoto(entity, {
+                isBig: false,
+              });
+              if (photoBuffer && typeof photoBuffer !== 'string' && photoBuffer.length > 0) {
+                const uint8Array = new Uint8Array(photoBuffer);
+                let binary = '';
+                uint8Array.forEach((byte) => {
+                  binary += String.fromCharCode(byte);
+                });
+                const base64 = btoa(binary);
+                results[index].photoUrl = `data:image/jpeg;base64,${base64}`;
+              }
+            } catch {
+              // Ігноруємо помилки завантаження фото
+            }
+          }
+        })
+      );
+
+      // Оновлюємо UI після кожного батчу
+      if (onProgress) {
+        onProgress([...results]);
+      }
     }
 
     return results;

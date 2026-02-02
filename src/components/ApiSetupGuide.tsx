@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ExternalLink, Key, Copy, Check, AlertCircle } from 'lucide-react';
+import { ExternalLink, Key, Copy, Check, AlertCircle, FileSearch } from 'lucide-react';
 import type { ApiCredentials } from '../types/auth';
 
 interface ApiSetupGuideProps {
   onSubmit: (credentials: ApiCredentials) => void;
   isLoading: boolean;
   error: string | null;
+  onAnalyzeFile?: () => void;
 }
 
-export function ApiSetupGuide({ onSubmit, isLoading, error }: ApiSetupGuideProps) {
+export function ApiSetupGuide({ onSubmit, isLoading, error, onAnalyzeFile }: ApiSetupGuideProps) {
   const [apiId, setApiId] = useState('');
   const [apiHash, setApiHash] = useState('');
   const [copied, setCopied] = useState(false);
@@ -157,6 +158,25 @@ export function ApiSetupGuide({ onSubmit, isLoading, error }: ApiSetupGuideProps
           вашому браузері. Ми не маємо доступу до них і не передаємо на сервери.
         </p>
       </div>
+
+      {onAnalyzeFile && (
+        <div className="analyze-file-section">
+          <div className="divider">
+            <span>або</span>
+          </div>
+          <button
+            type="button"
+            className="analyze-file-btn"
+            onClick={onAnalyzeFile}
+          >
+            <FileSearch size={20} />
+            Аналізувати готовий файл експорту
+          </button>
+          <p className="analyze-hint">
+            Завантажте JSON файл експорту для пошуку та перегляду повідомлень
+          </p>
+        </div>
+      )}
     </div>
   );
 }
