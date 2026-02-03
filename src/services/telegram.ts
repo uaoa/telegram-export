@@ -381,7 +381,11 @@ class TelegramService {
       if (!msg.media || !msg.media._rawMedia) continue;
 
       try {
-        const buffer = await this.client.downloadMedia(msg.media._rawMedia, {});
+        const buffer = await this.client.downloadMedia(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          msg.media._rawMedia as any,
+          {}
+        );
 
         if (buffer && typeof buffer !== 'string') {
           const uint8Array = new Uint8Array(buffer);
