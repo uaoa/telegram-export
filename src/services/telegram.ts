@@ -320,7 +320,7 @@ class TelegramService {
       let mediaInfo: TelegramMessageData['media'] | undefined;
       if (msg.media) {
         if (msg.media.className === 'MessageMediaPhoto') {
-          mediaInfo = { type: 'photo' };
+          mediaInfo = { type: 'photo', _rawMedia: msg.media };
         } else if (msg.media.className === 'MessageMediaDocument') {
           const docMedia = msg.media as { document?: { mimeType?: string; attributes?: Array<{ className: string; fileName?: string }> } };
           const doc = docMedia.document;
@@ -331,6 +331,7 @@ class TelegramService {
             mediaInfo = {
               type: doc.mimeType || 'document',
               fileName: fileAttr?.fileName,
+              _rawMedia: msg.media,
             };
           }
         } else if (msg.media.className === 'MessageMediaWebPage') {
@@ -356,6 +357,53 @@ class TelegramService {
       // Невелика затримка щоб не перевищити rate limit
       if (messages.length % 100 === 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    return messages;
+  }
+
+  // Завантаження медіа для повідомлень
+  async downloadMedia(
+    messages: TelegramMessageData[],
+    onProgress?: (current: number, total: number) => void
+  ): Promise<TelegramMessageData[]> {
+    if (!this.client) throw new Error('Клієнт не ініціалізовано');
+
+    const messagesWithMedia = messages.filter(
+      (m) => m.media?._rawMedia && (m.media.type === 'photo' || m.media.type.startsWith('image/'))
+    );
+
+    let downloaded = 0;
+    const total = messagesWithMedia.length;
+
+    for (const msg of messagesWithMedia) {
+      if (!msg.media || !msg.media._rawMedia) continue;
+
+      try {
+        const buffer = await this.client.downloadMedia(msg.media._rawMedia, {});
+
+        if (buffer && typeof buffer !== 'string') {
+          const uint8Array = new Uint8Array(buffer);
+          const ext = msg.media.type === 'photo' ? 'jpg' : 'jpg';
+          const fileName = `photo_${msg.id}.${ext}`;
+
+          msg.media.localPath = `media/${fileName}`;
+          msg.media.data = uint8Array;
+          msg.media.mimeType = 'image/jpeg';
+        }
+      } catch (error) {
+        console.error(`Помилка завантаження медіа для повідомлення ${msg.id}:`, error);
+      }
+
+      downloaded++;
+      if (onProgress) {
+        onProgress(downloaded, total);
+      }
+
+      // Rate limit
+      if (downloaded % 10 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
 

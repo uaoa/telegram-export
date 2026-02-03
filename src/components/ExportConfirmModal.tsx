@@ -1,15 +1,21 @@
-import { X, Download, Calendar, MessageSquare, Hash } from 'lucide-react';
+import { Calendar, Download, Hash, Image, MessageSquare, X } from 'lucide-react';
 import type { TelegramDialog, ForumTopic } from '../types/auth';
 import type { DateRange } from './DateRangeSelector';
+
+export interface ExportOptions {
+  includeMedia: boolean;
+}
 
 interface ExportConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (options: ExportOptions) => void;
   dialog: TelegramDialog;
   dateRange: DateRange;
   selectedTopic?: ForumTopic | null;
   isLoading: boolean;
+  exportOptions: ExportOptions;
+  onOptionsChange: (options: ExportOptions) => void;
 }
 
 export function ExportConfirmModal({
@@ -20,6 +26,8 @@ export function ExportConfirmModal({
   dateRange,
   selectedTopic,
   isLoading,
+  exportOptions,
+  onOptionsChange,
 }: ExportConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -98,6 +106,24 @@ export function ExportConfirmModal({
             </div>
           </div>
 
+          <div className="export-options">
+            <label className="option-checkbox">
+              <input
+                type="checkbox"
+                checked={exportOptions.includeMedia}
+                onChange={(e) => onOptionsChange({ ...exportOptions, includeMedia: e.target.checked })}
+                disabled={isLoading}
+              />
+              <Image size={18} />
+              <span>Завантажити фото та медіа</span>
+            </label>
+            {exportOptions.includeMedia && (
+              <p className="option-hint">
+                Медіафайли будуть збережені в окремій папці. Експорт займе більше часу.
+              </p>
+            )}
+          </div>
+
           <p className="modal-note">
             Експорт може зайняти деякий час залежно від кількості повідомлень.
             Не закривайте сторінку під час експорту.
@@ -108,7 +134,7 @@ export function ExportConfirmModal({
           <button type="button" className="modal-btn secondary" onClick={onClose} disabled={isLoading}>
             Скасувати
           </button>
-          <button type="button" className="modal-btn primary" onClick={onConfirm} disabled={isLoading}>
+          <button type="button" className="modal-btn primary" onClick={() => onConfirm(exportOptions)} disabled={isLoading}>
             {isLoading ? (
               <>
                 <span className="spinner-small" />

@@ -1,4 +1,5 @@
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 import type { TelegramMessageData } from '../types/auth';
 
 interface ChatInfo {
@@ -7,18 +8,280 @@ interface ChatInfo {
   id: string;
 }
 
+export interface ExportOptions {
+  includeMedia: boolean;
+}
+
 export function exportChatFromApi(
   chat: ChatInfo,
   messages: TelegramMessageData[],
-  format: 'html' | 'json' | 'json-ai'
+  format: 'html' | 'json' | 'json-ai',
+  options?: ExportOptions
 ): void {
-  if (format === 'json') {
+  const hasMedia = options?.includeMedia && messages.some(m => m.media?.data);
+
+  if (hasMedia) {
+    exportWithMedia(chat, messages, format);
+  } else if (format === 'json') {
     exportAsJson(chat, messages);
   } else if (format === 'json-ai') {
     exportAsJsonForAI(chat, messages);
   } else {
     exportAsHtml(chat, messages);
   }
+}
+
+async function exportWithMedia(
+  chat: ChatInfo,
+  messages: TelegramMessageData[],
+  format: 'html' | 'json' | 'json-ai'
+): Promise<void> {
+  const zip = new JSZip();
+  const mediaFolder = zip.folder('media');
+
+  // Додаємо медіафайли
+  for (const msg of messages) {
+    if (msg.media?.data && msg.media.localPath) {
+      const fileName = msg.media.localPath.replace('media/', '');
+      mediaFolder?.file(fileName, msg.media.data);
+    }
+  }
+
+  // Генеруємо основний файл
+  let mainContent: string;
+  let mainFileName: string;
+
+  if (format === 'json') {
+    mainContent = generateJsonWithMediaPaths(chat, messages);
+    mainFileName = 'export.json';
+  } else if (format === 'json-ai') {
+    mainContent = generateJsonForAI(chat, messages);
+    mainFileName = 'export_ai.json';
+  } else {
+    mainContent = generateHtmlWithMedia(chat, messages);
+    mainFileName = 'export.html';
+  }
+
+  zip.file(mainFileName, mainContent);
+
+  // Генеруємо та зберігаємо ZIP
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const zipFileName = `${sanitizeFileName(chat.name)}_export.zip`;
+  saveAs(blob, zipFileName);
+}
+
+function generateJsonWithMediaPaths(chat: ChatInfo, messages: TelegramMessageData[]): string {
+  const exportData = {
+    chat_name: chat.name,
+    chat_type: chat.type,
+    chat_id: chat.id,
+    exported_at: new Date().toISOString(),
+    total_messages: messages.length,
+    messages: messages.map((msg) => ({
+      id: msg.id,
+      date: msg.date.toISOString(),
+      from: msg.fromName || msg.fromId || 'Невідомий',
+      text: msg.text,
+      media: msg.media ? {
+        type: msg.media.type,
+        fileName: msg.media.fileName,
+        localPath: msg.media.localPath,
+      } : undefined,
+      reply_to: msg.replyToMsgId,
+      forwarded_from: msg.forwardedFrom,
+    })),
+  };
+
+  return JSON.stringify(exportData, null, 2);
+}
+
+function generateJsonForAI(chat: ChatInfo, messages: TelegramMessageData[]): string {
+  const sortedMessages = [...messages].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const formatShortDate = (date: Date) => {
+    return date.toLocaleDateString('uk-UA', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    }) + ' ' + date.toLocaleTimeString('uk-UA', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const compactMessages = sortedMessages
+    .filter(msg => msg.text.trim())
+    .map((msg) => {
+      const author = msg.fromName || 'Анонім';
+      const time = formatShortDate(msg.date);
+      const text = msg.text.trim();
+
+      let mediaNote = '';
+      if (msg.media) {
+        if (msg.media.localPath) {
+          mediaNote = ` [фото: ${msg.media.localPath}]`;
+        } else if (msg.media.type === 'photo') {
+          mediaNote = ' [фото]';
+        } else if (msg.media.fileName) {
+          mediaNote = ` [файл: ${msg.media.fileName}]`;
+        }
+      }
+
+      const fwdNote = msg.forwardedFrom ? ` (переслано від ${msg.forwardedFrom})` : '';
+
+      return {
+        t: time,
+        a: author,
+        m: text + mediaNote + fwdNote,
+      };
+    });
+
+  const exportData = {
+    _info: 'Експорт чату для аналізу ШІ. Поля: t=час, a=автор, m=повідомлення',
+    chat: chat.name,
+    period: compactMessages.length > 0
+      ? `${compactMessages[0].t} — ${compactMessages[compactMessages.length - 1].t}`
+      : 'немає повідомлень',
+    count: compactMessages.length,
+    messages: compactMessages,
+  };
+
+  return JSON.stringify(exportData, null, 2);
+}
+
+function generateHtmlWithMedia(chat: ChatInfo, messages: TelegramMessageData[]): string {
+  const messagesHtml = messages
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((msg) => generateMessageHtmlWithMedia(msg))
+    .join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(chat.name)} - Telegram Export</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    .header {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .header h1 { color: #1a1a2e; font-size: 24px; margin-bottom: 8px; }
+    .header .meta { color: #666; font-size: 14px; }
+    .messages {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .message {
+      padding: 12px 16px;
+      margin: 8px 0;
+      border-radius: 12px;
+      background: #f5f7fa;
+    }
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .sender { font-weight: 600; color: #667eea; }
+    .date { color: #999; font-size: 12px; }
+    .text { color: #333; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+    .media-image {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    .media-indicator { color: #999; font-style: italic; font-size: 13px; margin-top: 4px; }
+    .forwarded { color: #999; font-size: 12px; margin-bottom: 4px; }
+    .search-box {
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      border: none;
+      border-radius: 8px;
+      width: 100%;
+      font-size: 14px;
+      background: #f5f7fa;
+    }
+    .search-box:focus { outline: 2px solid #667eea; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${escapeHtml(chat.name)}</h1>
+      <p class="meta">
+        Тип: ${escapeHtml(chat.type)} |
+        Повідомлень: ${messages.length.toLocaleString('uk-UA')} |
+        Експортовано: ${formatDate(new Date())}
+      </p>
+    </div>
+    <div class="messages">
+      <input type="text" class="search-box" placeholder="Пошук повідомлень..." onkeyup="filterMessages(this.value)">
+      <div id="messages-list">
+        ${messagesHtml}
+      </div>
+    </div>
+  </div>
+  <script>
+    function filterMessages(query) {
+      const messages = document.querySelectorAll('.message');
+      const lowerQuery = query.toLowerCase();
+      messages.forEach(msg => {
+        const text = msg.textContent.toLowerCase();
+        msg.style.display = text.includes(lowerQuery) ? 'block' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>`;
+}
+
+function generateMessageHtmlWithMedia(message: TelegramMessageData): string {
+  let mediaHtml = '';
+  if (message.media) {
+    if (message.media.localPath) {
+      mediaHtml = `<img class="media-image" src="${escapeHtml(message.media.localPath)}" alt="Фото" loading="lazy">`;
+    } else if (message.media.type === 'photo') {
+      mediaHtml = '<div class="media-indicator">[Фото]</div>';
+    } else if (message.media.fileName) {
+      mediaHtml = `<div class="media-indicator">[Файл: ${escapeHtml(message.media.fileName)}]</div>`;
+    } else {
+      mediaHtml = `<div class="media-indicator">[${escapeHtml(message.media.type)}]</div>`;
+    }
+  }
+
+  let forwardedIndicator = '';
+  if (message.forwardedFrom) {
+    forwardedIndicator = `<div class="forwarded">Переслано від: ${escapeHtml(message.forwardedFrom)}</div>`;
+  }
+
+  const senderName = message.fromName || message.fromId || 'Невідомий';
+
+  return `
+    <div class="message" data-id="${message.id}">
+      ${forwardedIndicator}
+      <div class="message-header">
+        <span class="sender">${escapeHtml(senderName)}</span>
+        <span class="date">${formatDate(message.date)}</span>
+      </div>
+      <div class="text">${escapeHtml(message.text)}</div>
+      ${mediaHtml}
+    </div>
+  `;
 }
 
 function exportAsJson(chat: ChatInfo, messages: TelegramMessageData[]): void {

@@ -7,7 +7,7 @@ import { DialogSelector, type DialogLimit } from './components/DialogSelector';
 import { ExportProgress } from './components/ExportProgress';
 import { DateRangeSelector, type DateRange } from './components/DateRangeSelector';
 import { TopicSelector } from './components/TopicSelector';
-import { ExportConfirmModal } from './components/ExportConfirmModal';
+import { ExportConfirmModal, type ExportOptions } from './components/ExportConfirmModal';
 import { FileAnalyzer } from './components/FileAnalyzer';
 import { telegramService } from './services/telegram';
 import {
@@ -57,6 +57,9 @@ function App() {
   // Modal
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingDialog, setPendingDialog] = useState<TelegramDialog | null>(null);
+
+  // Export options
+  const [exportOptions, setExportOptions] = useState<ExportOptions>({ includeMedia: false });
 
   const [exportState, setExportState] = useState<ExportState>({
     isExporting: false,
@@ -303,11 +306,12 @@ function App() {
   }, []);
 
   // Підтвердження експорту
-  const handleConfirmExport = useCallback(async () => {
+  const handleConfirmExport = useCallback(async (options: ExportOptions) => {
     const dialog = pendingDialog || selectedDialog;
     if (!dialog) return;
 
     setShowConfirmModal(false);
+    setExportOptions(options);
     setStep('exporting');
     setExportState({
       isExporting: true,
@@ -330,6 +334,25 @@ function App() {
         dateRange,
         selectedTopic?.id
       );
+
+      // Якщо потрібно завантажити медіа
+      if (options.includeMedia) {
+        const mediaCount = loadedMessages.filter(m => m.media?._rawMedia).length;
+        if (mediaCount > 0) {
+          setExportState((prev) => ({
+            ...prev,
+            currentPhase: 'downloading_media',
+            mediaProgress: { current: 0, total: mediaCount },
+          }));
+
+          await telegramService.downloadMedia(loadedMessages, (current, total) => {
+            setExportState((prev) => ({
+              ...prev,
+              mediaProgress: { current, total },
+            }));
+          });
+        }
+      }
 
       setMessages(loadedMessages);
       setExportState((prev) => ({
@@ -388,10 +411,11 @@ function App() {
           id: selectedDialog.id,
         },
         messages,
-        format
+        format,
+        exportOptions
       );
     },
-    [selectedDialog, selectedTopic, messages]
+    [selectedDialog, selectedTopic, messages, exportOptions]
   );
 
   const handleLogout = useCallback(async () => {
@@ -522,6 +546,8 @@ function App() {
           dateRange={dateRange}
           selectedTopic={selectedTopic}
           isLoading={false}
+          exportOptions={exportOptions}
+          onOptionsChange={setExportOptions}
         />
       )}
     </div>

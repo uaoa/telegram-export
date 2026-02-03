@@ -1215,6 +1215,17 @@ body {
   transition: width 0.3s ease;
 }
 
+.progress-fill.media {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.media-progress-indicator {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: #10b981;
+}
+
 .progress-stats {
   display: flex;
   justify-content: space-between;
@@ -1502,6 +1513,42 @@ body {
   color: var(--text-muted);
   text-align: center;
   line-height: 1.5;
+}
+
+/* Export Options */
+.export-options {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+}
+
+.option-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.option-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.option-checkbox svg {
+  color: var(--primary);
+}
+
+.option-hint {
+  margin-top: 8px;
+  margin-left: 28px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .modal-actions {
