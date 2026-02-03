@@ -1,5 +1,12 @@
 # Telegram Chat Export
 
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev)
+[![License](https://img.shields.io/github/license/uaoa/telegram-export?style=for-the-badge)](LICENSE)
+
+[![Open App](https://img.shields.io/badge/Open_App-uaoa.github.io-2AABEE?style=for-the-badge&logo=telegram)](https://uaoa.github.io/telegram-export/)
+
 Export your Telegram chats directly from the browser using the official Telegram API.
 
 ## Features
