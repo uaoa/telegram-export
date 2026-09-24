@@ -11,16 +11,20 @@ interface DateRangeSelectorProps {
 }
 
 export function DateRangeSelector({ dateRange, onChange }: DateRangeSelectorProps) {
+  // Використовуємо локальну дату: toISOString() дає UTC і біля опівночі зсуває день
   const formatDateForInput = (date: Date | null): string => {
     if (!date) return '';
-    return date.toISOString().split('T')[0];
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
   };
 
   const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     onChange({
       ...dateRange,
-      from: value ? new Date(value) : null,
+      // Без часу рядок 'YYYY-MM-DD' парситься як UTC, а не локальна північ
+      from: value ? new Date(value + 'T00:00:00') : null,
     });
   };
 

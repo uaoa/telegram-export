@@ -21,7 +21,10 @@ export function exportChatFromApi(
   const hasMedia = options?.includeMedia && messages.some(m => m.media?.data);
 
   if (hasMedia) {
-    exportWithMedia(chat, messages, format);
+    exportWithMedia(chat, messages, format).catch((error) => {
+      console.error('Помилка створення архіву:', error);
+      alert('Не вдалося створити архів з медіа');
+    });
   } else if (format === 'json') {
     exportAsJson(chat, messages);
   } else if (format === 'json-ai') {
@@ -150,7 +153,7 @@ function generateJsonForAI(chat: ChatInfo, messages: TelegramMessageData[]): str
 }
 
 function generateHtmlWithMedia(chat: ChatInfo, messages: TelegramMessageData[]): string {
-  const messagesHtml = messages
+  const messagesHtml = [...messages]
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .map((msg) => generateMessageHtmlWithMedia(msg))
     .join('\n');
@@ -296,7 +299,8 @@ function exportAsJson(chat: ChatInfo, messages: TelegramMessageData[]): void {
       date: msg.date.toISOString(),
       from: msg.fromName || msg.fromId || 'Невідомий',
       text: msg.text,
-      media: msg.media,
+      // Без _rawMedia: це сирий TL-об'єкт GramJS (file_reference, access_hash тощо)
+      media: msg.media ? { type: msg.media.type, fileName: msg.media.fileName } : undefined,
       reply_to: msg.replyToMsgId,
       forwarded_from: msg.forwardedFrom,
     })),
@@ -386,7 +390,7 @@ function exportAsHtml(chat: ChatInfo, messages: TelegramMessageData[]): void {
 }
 
 function generateHtml(chat: ChatInfo, messages: TelegramMessageData[]): string {
-  const messagesHtml = messages
+  const messagesHtml = [...messages]
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .map((msg) => generateMessageHtml(msg))
     .join('\n');

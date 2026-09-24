@@ -9,7 +9,7 @@ import { DateRangeSelector, type DateRange } from './components/DateRangeSelecto
 import { TopicSelector } from './components/TopicSelector';
 import { ExportConfirmModal, type ExportOptions } from './components/ExportConfirmModal';
 import { FileAnalyzer } from './components/FileAnalyzer';
-import { telegramService } from './services/telegram';
+import { telegramService, isDownloadableImage } from './services/telegram';
 import {
   getApiCredentials,
   saveApiCredentials,
@@ -93,6 +93,9 @@ function App() {
 
   // Перевіряємо збережені credentials при завантаженні
   useEffect(() => {
+    // StrictMode запускає ефект двічі: результат першого (скасованого) запуску ігноруємо
+    let cancelled = false;
+
     const checkSavedCredentials = async () => {
       const credentials = getApiCredentials();
       if (credentials) {
@@ -100,6 +103,7 @@ function App() {
         try {
           await telegramService.initialize(credentials);
           const isAuthorized = await telegramService.isAuthorized();
+          if (cancelled) return;
 
           if (isAuthorized) {
             setStep('dialogs');
@@ -108,15 +112,20 @@ function App() {
             setStep('auth');
           }
         } catch (err) {
+          if (cancelled) return;
           console.error('Помилка ініціалізації:', err);
           setStep('setup');
         } finally {
-          setIsLoading(false);
+          if (!cancelled) setIsLoading(false);
         }
       }
     };
 
     checkSavedCredentials();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadDialogs]);
 
   const handleApiSubmit = useCallback(async (credentials: ApiCredentials) => {
@@ -254,6 +263,7 @@ function App() {
   }, [loadDialogs]);
 
   const handleBackToSetup = useCallback(() => {
+    telegramService.disconnect();
     clearAllData();
     setStep('setup');
     setAuthState({
@@ -337,7 +347,7 @@ function App() {
 
       // Якщо потрібно завантажити медіа
       if (options.includeMedia) {
-        const mediaCount = loadedMessages.filter(m => m.media?._rawMedia).length;
+        const mediaCount = loadedMessages.filter(isDownloadableImage).length;
         if (mediaCount > 0) {
           setExportState((prev) => ({
             ...prev,
@@ -419,7 +429,7 @@ function App() {
   );
 
   const handleLogout = useCallback(async () => {
-    await telegramService.disconnect();
+    await telegramService.logOut();
     clearAllData();
     setStep('setup');
     setDialogs([]);

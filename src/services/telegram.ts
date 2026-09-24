@@ -23,12 +23,41 @@ async function loadGramJS() {
   }
 }
 
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'image/heic': 'heic',
+};
+
+// Медіа, які завантажуються при експорті (фото та зображення-документи)
+export function isDownloadableImage(message: TelegramMessageData): boolean {
+  return (
+    !!message.media?._rawMedia &&
+    (message.media.type === 'photo' || message.media.type.startsWith('image/'))
+  );
+}
+
 class TelegramService {
   private client: InstanceType<typeof import('telegram').TelegramClient> | null = null;
   private credentials: ApiCredentials | null = null;
 
-  async initialize(credentials: ApiCredentials): Promise<void> {
+  private initQueue: Promise<void> = Promise.resolve();
+
+  // Виклики виконуються послідовно, щоб паралельна ініціалізація не створила два клієнти
+  initialize(credentials: ApiCredentials): Promise<void> {
+    const run = this.initQueue.then(() => this.doInitialize(credentials));
+    this.initQueue = run.catch(() => {});
+    return run;
+  }
+
+  private async doInitialize(credentials: ApiCredentials): Promise<void> {
     await loadGramJS();
+
+    // Не лишаємо попереднє з'єднання висіти у фоні при повторній ініціалізації
+    await this.disconnect();
 
     this.credentials = credentials;
 
@@ -67,13 +96,17 @@ class TelegramService {
     if (!this.client) throw new Error('Клієнт не ініціалізовано');
 
     try {
-      await this.client.invoke(
+      const result = await this.client.invoke(
         new Api.auth.SignIn({
           phoneNumber,
           phoneCodeHash,
           phoneCode,
         })
       );
+
+      if (result instanceof Api.auth.AuthorizationSignUpRequired) {
+        throw new Error('Цей номер не зареєстрований у Telegram');
+      }
 
       await this.saveCurrentSession();
       return { requiresPassword: false };
@@ -370,9 +403,7 @@ class TelegramService {
   ): Promise<TelegramMessageData[]> {
     if (!this.client) throw new Error('Клієнт не ініціалізовано');
 
-    const messagesWithMedia = messages.filter(
-      (m) => m.media?._rawMedia && (m.media.type === 'photo' || m.media.type.startsWith('image/'))
-    );
+    const messagesWithMedia = messages.filter(isDownloadableImage);
 
     let downloaded = 0;
     const total = messagesWithMedia.length;
@@ -389,12 +420,14 @@ class TelegramService {
 
         if (buffer && typeof buffer !== 'string') {
           const uint8Array = new Uint8Array(buffer);
-          const ext = msg.media.type === 'photo' ? 'jpg' : 'jpg';
+          // Фото Telegram завжди JPEG, а зображення-документи зберігаємо в їхньому форматі
+          const mimeType = msg.media.type === 'photo' ? 'image/jpeg' : msg.media.type;
+          const ext = IMAGE_EXTENSIONS[mimeType] ?? 'jpg';
           const fileName = `photo_${msg.id}.${ext}`;
 
           msg.media.localPath = `media/${fileName}`;
           msg.media.data = uint8Array;
-          msg.media.mimeType = 'image/jpeg';
+          msg.media.mimeType = mimeType;
         }
       } catch (error) {
         console.error(`Помилка завантаження медіа для повідомлення ${msg.id}:`, error);
@@ -414,10 +447,27 @@ class TelegramService {
     return messages;
   }
 
+  // Завершує сесію на сервері Telegram, щоб вона не лишалась в «Активних сеансах»
+  async logOut(): Promise<void> {
+    if (this.client) {
+      try {
+        await this.client.invoke(new Api.auth.LogOut());
+      } catch (error) {
+        console.error('Помилка виходу з акаунту:', error);
+      }
+    }
+    await this.disconnect();
+  }
+
   async disconnect(): Promise<void> {
     if (this.client) {
-      await this.client.disconnect();
+      const client = this.client;
       this.client = null;
+      try {
+        await client.disconnect();
+      } catch (error) {
+        console.error('Помилка відключення:', error);
+      }
     }
   }
 
