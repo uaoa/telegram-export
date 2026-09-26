@@ -20,6 +20,11 @@ export function Footer() {
 					<Github size={18} />
 					<span>Код на GitHub</span>
 				</a>
+				{/* Підпис автора веде на його головну сторінку: так пошуковики
+				    звʼязують цей інструмент з особою, а не лише з репо. */}
+				<a href="https://uaoa.github.io/uk/" rel="author me" className="github-link">
+					<span>Автор: Захарій Мельник, засновник AOA</span>
+				</a>
 			</div>
 		</footer>
 	);

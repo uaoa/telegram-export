@@ -47,3 +47,7 @@ No API connection needed — just drag and drop your file.
 ## Privacy
 
 All data is processed locally in your browser. Your credentials and messages never leave your device.
+
+## Author
+
+Made by [Zakharii Melnyk](https://uaoa.github.io/) (Захарій Мельник), founder of [AOA](https://aoa.com.ua/). Other projects: [whatsmyera.com](https://whatsmyera.com/), [wherethefuckismy.money](https://wherethefuckismy.money/), [Claude Commit](https://marketplace.visualstudio.com/items?itemName=ZakhariiMelnyk.claude-git-commit).
